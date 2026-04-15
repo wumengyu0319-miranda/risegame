@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>RISE最强大脑</title>
+    <style>
+        :root {
+            --primary-color: #f06b1e;
+            --primary-dark: #d85b13;
+            --bg-top: #8fd0ff;
+            --bg-middle: #d8f2ff;
+            --bg-bottom: #f4fbff;
+            --text-color: #18324d;
+            --success-color: #2eb67d;
+            --error-color: #d5434f;
+            --card-color: #ffffff;
+            --shelf-border: rgba(255, 255, 255, 0.9);
+            --shadow-lg: 0 18px 35px rgba(22, 66, 109, 0.18);
+        }
+
+        * { box-sizing: border-box; touch-action: manipulation; user-select: none; }
+
+        body {
+            margin: 0;
+            padding: 0;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+            font-family: "Trebuchet MS", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+            color: var(--text-color);
+            background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-middle) 52%, var(--bg-bottom) 100%);
+        }
+
+        #game-title {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(8px);
+            padding: 12px 20px;
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: 900;
+            color: var(--primary-color);
+            box-shadow: 0 4px 12px rgba(31, 85, 122, 0.14);
+            z-index: 10;
+            display: none;
+        }
+
+        #ui-header {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(8px);
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 8px 24px rgba(31, 85, 122, 0.14);
+            z-index: 10;
+        }
+
+        #score-area, #time-area { font-size: 1.12rem; font-weight: 800; }
+        #timer { color: var(--error-color); font-size: 1.35rem; }
+        #combo-status { font-size: 0.9rem; color: var(--primary-dark); min-height: 1.2rem; font-weight: 700; }
+
+        #game-container {
+            flex: 1;
+            position: relative;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            overflow: hidden;
+        }
+
+        #game-container::before,
+        #game-container::after {
+            content: "";
+            position: absolute;
+            border-radius: 999px;
+            filter: blur(1px);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        #game-container::before {
+            width: 360px;
+            height: 360px;
+            top: -180px;
+            left: -80px;
+            background: radial-gradient(circle, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0) 75%);
+        }
+
+        #game-container::after {
+            width: 420px;
+            height: 420px;
+            right: -120px;
+            top: -220px;
+            background: radial-gradient(circle, rgba(255, 245, 212, 0.55) 0%, rgba(255,245,212,0) 68%);
+        }
+
+        #card-conveyor {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 64%;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .word-card {
+            position: absolute;
+            min-width: 170px;
+            max-width: 240px;
+            padding: 10px 14px;
+            border-radius: 16px;
+            background: linear-gradient(160deg, #ffffff 0%, #f8fbff 100%);
+            border: 2px solid rgba(255, 255, 255, 0.95);
+            box-shadow: var(--shadow-lg);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: grab;
+            pointer-events: auto;
+            transform: translate(-50%, -50%);
+            transition: transform 0.12s ease-out, box-shadow 0.2s ease-out;
+        }
+        .word-card * {
+            pointer-events: none;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-user-drag: none;
+        }
+
+        .card-icon {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.05rem;
+            color: #333;
+            flex-shrink: 0;
+            box-shadow: inset 0 -2px 3px rgba(0,0,0,0.15);
+            background: #ffffff !important;
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+
+        .card-word {
+            font-size: 1.05rem;
+            font-weight: 800;
+            line-height: 1.15;
+            color: #1d3952;
+            white-space: nowrap;
+        }
+
+        .word-card.dragging {
+            opacity: 0.92;
+            cursor: grabbing;
+            box-shadow: 0 22px 34px rgba(8, 48, 90, 0.26);
+            transform: translate(-50%, -50%) scale(1.06) rotate(-2deg);
+            z-index: 100;
+            transition: none;
+        }
+
+        #shelves-container {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+            width: 100%;
+            padding: 0 6px 18px;
+            z-index: 8;
+        }
+
+        .shelf {
+            border-radius: 16px;
+            padding: 14px 12px;
+            min-height: 124px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            border: 3px solid rgba(255,255,255,0.3);
+            transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+            position: relative;
+            color: #fff;
+            box-shadow: inset 0 -8px 20px rgba(0,0,0,0.2), 0 8px 18px rgba(22, 67, 101, 0.2);
+            min-width: 0;
+            overflow: hidden;
+        }
+
+        .shelf::before {
+            content: "";
+            position: absolute;
+            left: 10px;
+            right: 10px;
+            bottom: 10px;
+            height: 8px;
+            border-radius: 8px;
+            background: rgba(0,0,0,0.16);
+        }
+
+        .shelf-title { 
+            font-size: 1.15rem; 
+            font-weight: 900; 
+            letter-spacing: 0.5px; 
+            margin-bottom: 4px; 
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            width: 100%;
+        }
+        
+        .shelf-desc { 
+            font-size: 0.82rem; 
+            opacity: 0.92; 
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            width: 100%;
+        }
+
+        .shelf.drag-over {
+            border-color: var(--shelf-border);
+            transform: scale(1.03);
+            box-shadow: inset 0 -8px 20px rgba(0,0,0,0.2), 0 10px 24px rgba(20, 63, 97, 0.32);
+        }
+        .shelf.correct-flash { animation: flash-green 0.5s; }
+        .shelf.wrong-flash { animation: flash-red 0.5s; }
+
+        @keyframes flash-green {
+            0%, 100% { border-color: transparent; }
+            50% { border-color: #b8ffe0; filter: brightness(1.08); }
+        }
+        @keyframes flash-red {
+            0%, 100% { border-color: transparent; }
+            50% { border-color: #ffd2d6; filter: brightness(0.96); }
+        }
+        @keyframes combo-pulse { 0% { transform: scale(1); } 50% { transform: scale(1.08); } 100% { transform: scale(1); } }
+        @keyframes screen-shake { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(-4px, 0); } 75% { transform: translate(4px, 0); } }
+
+        .combo-active #ui-header { animation: combo-pulse 0.3s ease-in-out; border-bottom: 2px solid var(--primary-color); }
+        .error-shake { animation: screen-shake 0.3s; }
+
+        .overlay {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(160deg, rgba(14,42,67,0.95) 0%, rgba(22,64,98,0.92) 100%);
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            padding: 24px;
+            text-align: center;
+        }
+
+        .overlay h1 { font-size: 2.3rem; color: #ffb169; margin-bottom: 10px; letter-spacing: 1px; }
+        .overlay p { font-size: 1.06rem; line-height: 1.6; max-width: 540px; margin-bottom: 28px; }
+        .overlay .stat { font-size: 1.4rem; margin: 8px 0; }
+        .overlay .high-score { color: #ffe39a; font-weight: 700; }
+
+        button.start-btn {
+            background: linear-gradient(140deg, var(--primary-color) 0%, #ff9750 100%);
+            color: #fff;
+            border: none;
+            padding: 14px 36px;
+            font-size: 1.2rem;
+            font-weight: 900;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.2s;
+            box-shadow: 0 10px 24px rgba(240,107,30,0.35);
+        }
+        button.start-btn:hover { box-shadow: 0 14px 30px rgba(240,107,30,0.45); }
+        button.start-btn:active { transform: scale(0.96); }
+
+        .float-text {
+            position: absolute;
+            font-weight: 900;
+            font-size: 1.35rem;
+            pointer-events: none;
+            z-index: 110;
+            animation: float-up 0.8s ease-out forwards;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.16);
+        }
+        .float-correct { color: var(--success-color); }
+        .float-wrong { color: var(--error-color); }
+        @keyframes float-up {
+            0% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-48px); }
+        }
+
+        #language-selector {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 200;
+            display: flex;
+            gap: 10px;
+        }
+
+        .lang-btn {
+            background: rgba(255, 255, 255, 0.8);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 20px;
+            padding: 8px 16px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .lang-btn.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        @media (max-width: 700px) {
+            #game-title { font-size: 1.2rem; padding: 8px 12px; }
+            #ui-header { padding: 10px 12px; }
+            #score-area, #time-area { font-size: 1rem; }
+            .word-card { min-width: 150px; max-width: 200px; padding: 8px 10px; }
+            .card-word { font-size: 0.95rem; }
+            .card-icon { width: 30px; height: 30px; }
+            #shelves-container { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding-bottom: 12px; }
+            .shelf { min-height: 92px; border-radius: 12px; padding: 10px 8px; }
+            .shelf-title { font-size: 0.82rem; }
+            .shelf-desc { font-size: 0.66rem; }
+            #language-selector { top: 10px; right: 10px; }
+            .lang-btn { padding: 6px 12px; font-size: 0.8rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="language-selector">
+        <button class="lang-btn active" data-lang="zh">中文</button>
+        <button class="lang-btn" data-lang="en">English</button>
+    </div>
+
+    <div id="game-title">RISE最强大脑</div>
+
+    <div id="ui-header">
+        <div id="score-area">
+            <span data-i18n="score">得分</span>: <span id="score">0</span>
+            <div id="combo-status"></div>
+        </div>
+        <div id="time-area"><span data-i18n="time">时间</span>: <span id="timer">60</span>s</div>
+    </div>
+
+    <div id="game-container">
+        <div id="card-conveyor"></div>
+
+        <div id="shelves-container">
+            <!-- 货架将通过JavaScript动态生成 -->
+        </div>
+    </div>
+
+    <div id="start-overlay" class="overlay">
+        <h1 data-i18n="gameTitle">RISE最强大脑</h1>
+        <p data-i18n="gameRules">
+            🎮 游戏规则<br>
+            1分钟限时闯关，将掉落的关键词卡片，精准分拣移动至对应核心价值观框内。<br>
+            <span style="color:var(--success-color)">● 正确分拣：+5分 | 连续正确获额外加分</span><br>
+            <span style="color:var(--error-color)">● 分拣失误：-3秒 | 本次不计分</span>
+        </p>
+        <button class="start-btn" onclick="startGame()" data-i18n="startGame">开始游戏</button>
+    </div>
+
+    <div id="end-overlay" class="overlay" style="display: none;">
+        <h1 data-i18n="gameOver">游戏结束</h1>
+        <div class="stat"><span data-i18n="finalScore">本次得分</span>: <span id="final-score" style="color:var(--primary-color); font-size:2rem;">0</span></div>
+        <div class="stat"><span data-i18n="maxCombo">最大连击</span>: <span id="max-combo">0</span></div>
+        <div class="stat"><span data-i18n="accuracy">正确/总数</span>: <span id="accuracy">0/0</span></div>
+        <p class="high-score"><span data-i18n="highScore">最高纪录</span>: <span id="local-high-score">0</span></p>
+        <button class="start-btn" onclick="startGame()" data-i18n="playAgain">再来一局</button>
+    </div>
+
+    <script>
+        // ================= 配置数据 =================
+        const GAME_DURATION = 60;
+        const DROP_INTERVAL = 1800;
+        const POINTS = { correct: 5, comboBonus: 3, errorPenalizeTime: 3 };
+
+        // 定义零售价值观货架
+        const VALUES_DATA = [
+            { 
+                id: 'respect', 
+                title: { zh: '尊重个人', en: 'Respect the Individual' }, 
+                desc: { zh: 'Respect the Individual', en: 'Respect the Individual' }, 
+                color: '#f1782d', 
+                words: { 
+                    zh: ['积极反馈与辅导', '主动倾听', '有效沟通', '正面影响及激发他人'], 
+                    en: ['Proactive feedback and coaching', 'Listen actively', 'Communicate with impact', 'Positively influence and inspire others'] 
+                } 
+            },
+            { 
+                id: 'integrity', 
+                title: { zh: '诚信行事', en: 'Act with Integrity' }, 
+                desc: { zh: 'Act with Integrity', en: 'Act with Integrity' }, 
+                color: '#7f61d4', 
+                words: { 
+                    zh: ['公仆领导', '自我觉察', '开诚布公', '保持和倡导诚信道德和合规行为'], 
+                    en: ['Servant leadership', 'Self-awareness', 'Be honest and transparent', 'Maintains and promotes integrity, ethics and compliance'] 
+                } 
+            },
+            { 
+                id: 'customer', 
+                title: { zh: '服务顾客和会员', en: 'Serve Our Customers and Members' }, 
+                desc: { zh: 'Serve Our Customers and Members', en: 'Serve Our Customers and Members' }, 
+                color: '#2eb67d', 
+                words: { 
+                    zh: ['全渠道思维', '全局视角', 'EDLP/EDLC', '分析与顾客/会员洞察'], 
+                    en: ['Omnichannel mindset', 'Holistic perspective', 'EDLP/EDLC', 'Integrating data analytics, customer/member insights'] 
+                } 
+            },
+            { 
+                id: 'excellence', 
+                title: { zh: '追求卓越', en: 'Strive for Excellence' }, 
+                desc: { zh: 'Strive for Excellence', en: 'Strive for Excellence' }, 
+                color: '#2a8fd6', 
+                words: { 
+                    zh: ['保持好奇心', '成长型思维', '理性冒险', '敏捷行动'], 
+                    en: ['Maintain curiosity', 'Growth mindset', 'Take calculated risks', 'Take agile action'] 
+                } 
+            }
+        ];
+
+        // 图标数据
+        const ICONS = ['🙂', '💬', '🎁', '🧡', '🤝', '👥', '📣', '🧩', '⚡', '📦', '✅', '🎯', '🛡️', '📘', '📋', '🌟'];
+
+        // 多语言文本
+        const I18N = {
+            zh: {
+                gameTitle: "RISE最强大脑",
+                gameRules: "🎮 游戏规则<br>1分钟限时闯关，将掉落的关键词卡片，精准分拣移动至对应核心价值观框内。<br><span style='color:var(--success-color)'>● 正确分拣：+5分 | 连续正确获额外加分</span><br><span style='color:var(--error-color)'>● 分拣失误：-3秒 | 本次不计分</span>",
+                startGame: "开始游戏",
+                score: "得分",
+                time: "时间",
+                gameOver: "游戏结束",
+                finalScore: "本次得分",
+                maxCombo: "最大连击",
+                accuracy: "正确/总数",
+                highScore: "最高纪录",
+                playAgain: "再来一局"
+            },
+            en: {
+                gameTitle: "RISE Brain Challenge",
+                gameRules: "🎮 Game Rules<br>1-minute timed challenge: Sort the falling keyword cards into the correct core value boxes.<br><span style='color:var(--success-color)'>● Correct: +5 points | Bonus for consecutive correct</span><br><span style='color:var(--error-color)'>● Wrong: -3 seconds | No points</span>",
+                startGame: "Start Game",
+                score: "Score",
+                time: "Time",
+                gameOver: "Game Over!",
+                finalScore: "Final Score",
+                maxCombo: "Max Combo",
+                accuracy: "Correct/Total",
+                highScore: "High Score",
+                playAgain: "Play Again"
+            }
+        };
+
+        // ================= 游戏状态变量 =================
+        let score = 0;
+        let timeLeft = GAME_DURATION;
+        let gameInterval = null;
+        let dropIntervalTimer = null;
+        let currentCombo = 0;
+        let maxCombo = 0;
+        let totalSpawned = 0;
+        let totalCorrect = 0;
+        let isGameRunning = false;
+        let currentLanguage = 'zh';
+
+        // 用于避免连续掉落相同关键词的变量
+        let lastShelfId = null;
+        let lastWordIndex = null;
+
+        let draggedElement = null;
+        let touchStartX = 0;
+        let touchStartY = 0;
+
+        // ================= 初始化 =================
+        const conveyor = document.getElementById('card-conveyor');
+        const shelvesContainer = document.getElementById('shelves-container');
+        const scoreEl = document.getElementById('score');
+        const timerEl = document.getElementById('timer');
+        const comboEl = document.getElementById('combo-status');
+        const bodyEl = document.body;
+        const gameTitleEl = document.getElementById('game-title');
+        const languageSelectorEl = document.getElementById('language-selector');
+
+        // 初始化语言选择
+        function initLanguageSelector() {
+            const langButtons = document.querySelectorAll('.lang-btn');
+            langButtons.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    langButtons.forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    currentLanguage = this.getAttribute('data-lang');
+                    updateLanguage();
+                });
+            });
+        }
+
+        // 更新页面语言
+        function updateLanguage() {
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (I18N[currentLanguage][key]) {
+                    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+                        el.value = I18N[currentLanguage][key];
+                    } else {
+                        el.innerHTML = I18N[currentLanguage][key];
+                    }
+                }
+            });
+            
+            if (shelvesContainer) {
+                initShelves();
+            }
+        }
+
+        // 生成货架 DOM
+        function initShelves() {
+            shelvesContainer.innerHTML = '';
+            VALUES_DATA.forEach(shelf => {
+                const shelfDiv = document.createElement('div');
+                shelfDiv.className = 'shelf';
+                shelfDiv.id = `shelf-${shelf.id}`;
+                shelfDiv.style.backgroundColor = shelf.color;
+                shelfDiv.setAttribute('data-value', shelf.id);
+                shelfDiv.innerHTML = `<div class="shelf-title">${shelf.title[currentLanguage]}</div><div class="shelf-desc">${shelf.desc[currentLanguage]}</div>`;
+
+                addDragTargetListeners(shelfDiv);
+                shelvesContainer.appendChild(shelfDiv);
+            });
+        }
+
+        // ================= 游戏核心逻辑 =================
+
+        function startGame() {
+            document.getElementById('start-overlay').style.display = 'none';
+            document.getElementById('end-overlay').style.display = 'none';
+            
+            gameTitleEl.style.display = 'block';
+            languageSelectorEl.style.display = 'none';
+
+            score = 0;
+            timeLeft = GAME_DURATION;
+            currentCombo = 0;
+            maxCombo = 0;
+            totalSpawned = 0;
+            totalCorrect = 0;
+            isGameRunning = true;
+            
+            lastShelfId = null;
+            lastWordIndex = null;
+
+            scoreEl.textContent = score;
+            timerEl.textContent = timeLeft;
+            comboEl.textContent = '';
+            conveyor.innerHTML = '';
+
+            initShelves();
+
+            gameInterval = setInterval(updateTimer, 1000);
+            dropIntervalTimer = setInterval(spawnCard, DROP_INTERVAL);
+
+            spawnCard();
+        }
+
+        function updateTimer() {
+            timeLeft--;
+            if (timeLeft <= 0) {
+                timeLeft = 0;
+                endGame();
+            }
+            timerEl.textContent = timeLeft;
+
+            if (timeLeft <= 10) {
+                timerEl.style.animation = 'combo-pulse 0.5s infinite';
+            } else {
+                timerEl.style.animation = 'none';
+            }
+        }
+
+        function endGame() {
+            isGameRunning = false;
+            clearInterval(gameInterval);
+            clearInterval(dropIntervalTimer);
+
+            const cards = document.querySelectorAll('.word-card');
+            cards.forEach(card => card.remove());
+
+            gameTitleEl.style.display = 'none';
+            languageSelectorEl.style.display = 'flex';
+
+            document.getElementById('end-overlay').style.display = 'flex';
+            document.getElementById('final-score').textContent = score;
+            document.getElementById('max-combo').textContent = maxCombo;
+            document.getElementById('accuracy').textContent = `${totalCorrect}/${totalSpawned}`;
+
+            let highScore = localStorage.getItem('sorting_high_score') || 0;
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('sorting_high_score', highScore);
+            }
+            document.getElementById('local-high-score').textContent = highScore;
+        }
+
+        // ================= 卡片生成与掉落 =================
+        function spawnCard() {
+            if (!isGameRunning) return;
+
+            let randomShelf, randomWord, randomWordIndex;
+            
+            do {
+                randomShelf = VALUES_DATA[Math.floor(Math.random() * VALUES_DATA.length)];
+                randomWordIndex = Math.floor(Math.random() * randomShelf.words[currentLanguage].length);
+                randomWord = randomShelf.words[currentLanguage][randomWordIndex];
+            } while (randomShelf.id === lastShelfId && randomWordIndex === lastWordIndex);
+            
+            lastShelfId = randomShelf.id;
+            lastWordIndex = randomWordIndex;
+            
+            const randomIcon = ICONS[Math.floor(Math.random() * ICONS.length)];
+
+            const card = document.createElement('div');
+            card.className = 'word-card';
+            card.innerHTML = `<span class="card-icon">${randomIcon}</span><span class="card-word">${randomWord}</span>`;
+            card.setAttribute('data-answer', randomShelf.id);
+            card.setAttribute('draggable', 'false');
+            card.addEventListener('dragstart', (e) => e.preventDefault());
+
+            const startX = Math.random() * 80 + 10;
+            card.style.left = `${startX}%`;
+            card.style.top = '-50px';
+
+            conveyor.appendChild(card);
+            totalSpawned++;
+
+            addDraggableListeners(card);
+            animateCardDrop(card);
+        }
+
+        function animateCardDrop(card) {
+            if (!isGameRunning || card.classList.contains('dragging')) return;
+
+            let currentY = parseFloat(card.style.top);
+            const speed = 0.85 + (score / 360);
+            const targetY = window.innerHeight * 0.7;
+
+            function step() {
+                if (!isGameRunning || !card.parentNode || card.classList.contains('dragging')) return;
+
+                currentY += speed;
+                card.style.top = `${currentY}px`;
+
+                if (currentY < targetY) {
+                    requestAnimationFrame(step);
+                } else {
+                    handleMiss(card);
+                }
+            }
+            requestAnimationFrame(step);
+        }
+
+        // ================= 分拣判断逻辑 =================
+
+        function handleCorrect(card, shelfEl) {
+            totalCorrect++;
+            currentCombo++;
+            if (currentCombo > maxCombo) maxCombo = currentCombo;
+
+            const comboBonus = Math.max(0, (currentCombo - 1) * POINTS.comboBonus);
+            const addedScore = POINTS.correct + comboBonus;
+            score += addedScore;
+            scoreEl.textContent = score;
+
+            shelfEl.classList.add('correct-flash');
+            setTimeout(() => shelfEl.classList.remove('correct-flash'), 500);
+
+            showFloatText(`+${addedScore}${currentCombo > 1 ? ' Combo!' : ''}`, shelfEl, 'float-correct');
+
+            if (currentCombo >= 3) {
+                comboEl.textContent = `${currentCombo} ${currentLanguage === 'zh' ? '连击' : 'Combo'} 🔥`;
+                bodyEl.classList.add('combo-active');
+            }
+
+            card.remove();
+        }
+
+        function handleWrong(card, shelfEl) {
+            currentCombo = 0;
+            comboEl.textContent = '';
+            bodyEl.classList.remove('combo-active');
+
+            timeLeft -= POINTS.errorPenalizeTime;
+            if (timeLeft < 0) timeLeft = 0;
+            timerEl.textContent = timeLeft;
+
+            shelfEl.classList.add('wrong-flash');
+            setTimeout(() => shelfEl.classList.remove('wrong-flash'), 500);
+            bodyEl.classList.add('error-shake');
+            setTimeout(() => bodyEl.classList.remove('error-shake'), 300);
+
+            showFloatText(`-${POINTS.errorPenalizeTime}s`, timerEl, 'float-wrong');
+
+            card.remove();
+        }
+
+        function handleMiss(card) {
+            currentCombo = 0;
+            comboEl.textContent = '';
+            bodyEl.classList.remove('combo-active');
+            card.remove();
+        }
+
+        // ================= 拖拽 & 触摸 交互 =================
+
+        function addDraggableListeners(el) {
+            el.addEventListener('mousedown', onMouseDown);
+            el.addEventListener('touchstart', onTouchStart, { passive: false });
+        }
+
+        function addDragTargetListeners(shelfEl) {
+            shelfEl.addEventListener('dragover', (e) => e.preventDefault());
+            shelfEl.addEventListener('dragenter', () => shelfEl.classList.add('drag-over'));
+            shelfEl.addEventListener('dragleave', () => shelfEl.classList.remove('drag-over'));
+        }
+
+        function onMouseDown(e) {
+            if (!isGameRunning) return;
+            e.preventDefault();
+            draggedElement = e.currentTarget;
+            startDragging(e.clientX, e.clientY);
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        }
+
+        function onMouseMove(e) { handleMove(e.clientX, e.clientY); }
+        function onMouseUp(e) { endDragging(e.clientX, e.clientY); }
+
+        function onTouchStart(e) {
+            if (!isGameRunning || e.touches.length > 1) return;
+            e.preventDefault();
+            draggedElement = e.currentTarget;
+            const touch = e.touches[0];
+            startDragging(touch.clientX, touch.clientY);
+
+            document.addEventListener('touchmove', onTouchMove, { passive: false });
+            document.addEventListener('touchend', onTouchEnd);
+        }
+
+        function onTouchMove(e) {
+            if (e.touches.length > 1) return;
+            e.preventDefault();
+            const touch = e.touches[0];
+            handleMove(touch.clientX, touch.clientY);
+        }
+
+        function onTouchEnd(e) {
+            const touch = e.changedTouches[0];
+            endDragging(touch.clientX, touch.clientY);
+        }
+
+        function startDragging(x, y) {
+            if (!draggedElement) return;
+            draggedElement.classList.add('dragging');
+            const rect = draggedElement.getBoundingClientRect();
+            touchStartX = x - (rect.left + rect.width / 2);
+            touchStartY = y - (rect.top + rect.height / 2);
+        }
+
+        function handleMove(x, y) {
+            if (!draggedElement) return;
+            const finalX = x - touchStartX;
+            const finalY = y - touchStartY;
+            draggedElement.style.left = `${finalX}px`;
+            draggedElement.style.top = `${finalY}px`;
+            draggedElement.style.position = 'fixed';
+        }
+
+        function endDragging(x, y) {
+            if (!draggedElement) return;
+
+            draggedElement.classList.remove('dragging');
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+            document.removeEventListener('touchmove', onTouchMove);
+            document.removeEventListener('touchend', onTouchEnd);
+
+            const targetShelf = findShelfAtPos(x, y);
+
+            if (targetShelf) {
+                const answer = draggedElement.getAttribute('data-answer');
+                const shelfValue = targetShelf.getAttribute('data-value');
+
+                if (answer === shelfValue) {
+                    handleCorrect(draggedElement, targetShelf);
+                } else {
+                    handleWrong(draggedElement, targetShelf);
+                }
+            } else {
+                draggedElement.style.position = 'absolute';
+                handleMiss(draggedElement);
+            }
+
+            document.querySelectorAll('.shelf').forEach(s => s.classList.remove('drag-over'));
+            draggedElement = null;
+        }
+
+        function findShelfAtPos(x, y) {
+            const shelves = document.querySelectorAll('.shelf');
+            for (let shelf of shelves) {
+                const rect = shelf.getBoundingClientRect();
+                if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+                    return shelf;
+                }
+            }
+            return null;
+        }
+
+        // ================= 通用 UI 效果 =================
+        function showFloatText(text, anchorEl, className) {
+            const rect = anchorEl.getBoundingClientRect();
+            const floatEl = document.createElement('div');
+            floatEl.className = `float-text ${className}`;
+            floatEl.textContent = text;
+
+            floatEl.style.left = `${rect.left + rect.width / 2 - 20}px`;
+            floatEl.style.top = `${rect.top - 20}px`;
+
+            document.body.appendChild(floatEl);
+
+            setTimeout(() => floatEl.remove(), 800);
+        }
+
+        // 初始化
+        function init() {
+            initLanguageSelector();
+            initShelves();
+            languageSelectorEl.style.display = 'flex';
+        }
+
+        // 页面加载完成后初始化
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+
+    <style>
+      .fixed-logo {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 1000;
+        transition: opacity 0.3s;
+      }
+      .fixed-logo:hover {
+        opacity: 0.8;
+      }
+      .fixed-logo img {
+        width: 60px;
+        height: auto;
+        border-radius: 50%;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+      }
+
+      /* 移动端样式：当屏幕宽度小于等于768px时生效（常见断点） */
+      @media (max-width: 768px) {
+        .fixed-logo img {
+          width: 40px; /* 移动端宽度 */
+        }
+        /* 如果需要，也可以同时调整Logo距离边界的距离 */
+        .fixed-logo {
+          bottom: 15px;
+          right: 15px;
+        }
+      }
+    </style>
+    <div class="fixed-logo">
+      <img src="https://aloha.walmartmobile.cn/user-center/upload/viewImage/bktuser-center-prod-8702570844139794433.png" alt="Logo" loading="lazy">
+    </div>
+  </body>
+</html>
